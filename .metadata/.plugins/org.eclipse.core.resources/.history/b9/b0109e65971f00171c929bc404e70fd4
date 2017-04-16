@@ -1,0 +1,57 @@
+/**    
+ * 文件名：SessionCache.java    
+ *    
+ * 版本信息：    
+ * 日期：2017年4月12日    
+ * Copyright 足下 Corporation 2017     
+ * 版权所有    
+ *    
+ */
+package JudtProtocol;
+
+import DDS_Transfer.IRecMsg;
+import JudtProtocol.JudtManager.SocketData;
+import udt.UDTClient;
+import udt.UDTSocket;
+
+/**    
+ *     
+ * 项目名称：ThirdPartyProtocol    
+ * 类名称：SessionCache    
+ * 类描述：    
+ * 创建人：jinyu    
+ * 创建时间：2017年4月12日 下午11:13:21    
+ * 修改人：jinyu    
+ * 修改时间：2017年4月12日 下午11:13:21    
+ * 修改备注：    
+ * @version     
+ *     
+ */
+public class SessionCache {
+    public void addSocket(UDTSocket socket, UdtProtocol protol,IRecMsg rec)
+    {
+        try {
+            SocketData data=new SocketData();
+            data.id=id.incrementAndGet();
+            data.protol=protol;
+            data.socket=socket;
+            data.outRec=rec;
+            socketQueue.put(data);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    public void addClient(UDTClient client)
+    {
+        try {
+            SocketData data=new SocketData();
+            data.id=id.incrementAndGet();
+           // data.protol=protol;
+           // data.socket=socket;
+           // data.outRec=rec;
+            socketQueue.put(data);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}

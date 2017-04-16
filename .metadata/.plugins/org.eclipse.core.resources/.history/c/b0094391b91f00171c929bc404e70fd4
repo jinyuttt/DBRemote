@@ -1,0 +1,247 @@
+
+package JudtProtocol;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import DDS_Transfer.IRecMsg;
+import udt.UDTInputStream;
+import udt.UDTSocket;
+
+
+/*
+ * 多连接时使用
+ * 主要用于udt服务端模式
+ */
+public class ProcessThread extends Thread{
+    public  boolean serverRunning=true;
+    public  static AtomicInteger counter_integer=new  AtomicInteger(0);
+    public  static volatile int ThreadName=0;
+    public  static  final int MaxThreadNum=10;
+    private static ExecutorService executorService = Executors.newFixedThreadPool(5);
+    //通讯执行
+    private UDTSocket socket=null;
+    private UdtProtocol curProtol=null;
+    private IRecMsg rec=null;
+    // 内部控制变量
+    private  int waitZeroNum=50;//适应传递效率
+    private volatile boolean isRecZero=true;
+    private int maxZeroTime=15*10000;//15秒
+    private  int recBuffersize = 16348;
+    private   int TIMEOUT=20000;
+    //线程执行控制
+    private boolean isAdd=false;
+	public ProcessThread(UDTSocket socket,IRecMsg outRec,UdtProtocol protol)
+	{
+		this.socket=socket;
+		this.rec=outRec;
+		this.curProtol=protol;
+		this.setName("udtSession+"+ThreadName++);
+	}
+	 /**
+     * 初始化时判断数据传递与接收的时间差
+     */
+    private boolean checkZeroFail()
+    {
+        if(!isRecZero)
+        {
+            //确定时间范围
+            if(waitZeroNum>maxZeroTime)
+            {
+            //说明是连续判断
+                waitZeroNum=maxZeroTime/2;
+            }
+        }
+        //最后一次判断会造成超过maxZeroTime
+        waitZeroNum=waitZeroNum+10;
+        if(waitZeroNum>maxZeroTime)
+        {
+            return false;//不能再等待
+        }
+        else
+        {
+            return true;
+        }
+    }
+    private boolean checkTimeout(long start){
+        boolean to=System.currentTimeMillis()-start>TIMEOUT;
+        if(to)
+            System.out.println("TIMEOUT");
+        return to;
+    }
+    
+    /**
+     * 数据返回
+     * @param rec 返回对象
+     * @param data   传入的数据
+     * @param address 来源地址
+     */
+    private void callData(IRecMsg rec, byte[] data, String address) {
+        curProtol.resetClientSocket(socket);
+        rec.SaveInstance(curProtol);
+        rec.RecData(address, data);
+    }
+    /**
+     * 合并数据
+     * @param src1
+     * @param src2
+     * @return
+     */
+    private byte[] catBytes(byte[]src1,byte[]src2)
+    {
+        byte[] result=null;
+         if(src1==null&&src2==null)
+         {
+             return null;
+         }
+        int len=0;
+        int index=0;
+        if(src1!=null)
+        {
+            len+=src1.length;
+        }
+        if(src2!=null)
+        {
+            len+=src2.length;
+        }
+        result=new byte[len];
+        if(src1!=null)
+        {
+          System.arraycopy(src1, 0, result, 0, src1.length);
+          index=src1.length;
+        }
+        if(src2!=null)
+        {
+             System.arraycopy(src2, 0, result,index, src2.length);
+        }
+        return result;
+    }
+    
+    /*
+     * 处理数据
+     */
+    private void processUdtData()
+    {
+        long start=System.currentTimeMillis();
+        //
+        counter_integer.incrementAndGet();
+        UDTInputStream is = null;
+     try {
+         is = socket.getInputStream();
+     } catch (IOException e2) {
+         e2.printStackTrace();
+     }
+        //is.setBlocking(false);
+        byte[]buf=new byte[recBuffersize];
+        byte[] tmp=null;
+        
+        while(serverRunning){
+            if(checkTimeout(start))break;
+            int c = 0;
+            if(curProtol!=null)
+            {
+                this.serverRunning=curProtol.serverRunning;
+            }
+         try {
+             c = is.read(buf);
+         } catch (IOException e1) {
+             e1.printStackTrace();
+         }
+            if(c<0)
+            {
+                System.out.println("客户端接收c<0");
+                break;
+            }
+            else{
+                if(c==0)
+                {
+                    try {
+                     Thread.sleep(waitZeroNum);
+                 } catch (InterruptedException e) {
+                  
+                     e.printStackTrace();
+                 }
+                    if(checkZeroFail())
+                    {
+                        continue;
+                    }
+                 }
+                else
+                {
+                    //找到一个恰当等待值，则允许2倍时间范围内浮动
+                    
+                     if(isRecZero)
+                     {
+                         //
+                         System.out.println("最大时间："+waitZeroNum);
+                         int sn=((20+waitZeroNum)*((waitZeroNum-20)/10)+1)/2;
+                         //已经确定
+                          System.out.println("总时间："+sn);
+                          maxZeroTime=sn*2;
+                          isRecZero=false;
+                     }
+                }
+                //
+                
+                if(c==buf.length)
+                {
+                    System.out.println("客户端拷贝跳出接收c="+c);
+                    tmp=catBytes(tmp,buf);
+                    //
+                }
+                else
+                {
+                    System.out.println("客户端跳出接收c="+c);
+                    byte[] cur=new byte[c];
+                    System.arraycopy(buf, 0, cur, 0, c);
+                    tmp=catBytes(tmp,cur);
+                    break;//没有达到缓存
+                    
+                }
+                Thread.yield();//防止高使用
+            }
+        }
+           
+        //正常运行的数据才要
+          if(serverRunning)
+          {
+              String  address=socket.getEndpoint().getLocalAddress().getHostAddress()+":"+socket.getEndpoint().getLocalPort();
+              callData(rec, tmp, address);
+              if(tmp!=null&&tmp.length>0)
+              JudtManager.getInstance().addSocket(socket,curProtol,rec);
+          }
+           counter_integer.decrementAndGet();
+           //
+           if(curProtol!=null)
+           {
+               curProtol.removeID(socket.getSession().getSocketID());
+           }
+          
+    }
+	 
+    
+    @Override 
+      public void run(){
+	      if(isAdd)
+	      {
+	          //已经加入到线程
+	          processUdtData();
+	      }
+	      else
+	      {
+           if(counter_integer.get()>MaxThreadNum)
+             {
+               this.isAdd=true;
+                executorService.execute(this);
+             }
+            else
+             {
+               processUdtData();
+             }
+	      }
+	  
+	  }
+	 
+		
+}

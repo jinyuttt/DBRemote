@@ -1,0 +1,1 @@
+{"connTimeOut":1000,"connectionTimeOut":1200000,"initConnections":5,"isCheakPool":true,"isCurrentConnection":true,"lazyCheck":3600000,"maxActiveConnections":100,"maxConnections":10,"minConnections":1,"periodCheck":3600000}

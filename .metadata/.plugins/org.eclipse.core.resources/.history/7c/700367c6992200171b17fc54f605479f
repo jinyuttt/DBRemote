@@ -1,0 +1,112 @@
+package DBManager;
+
+import DBError.ErrorCode;
+import DDS_Transfer.IDDS_Protocol;
+import DataStruct.DBResult;
+import ServerProxy.Proxy;
+import Table.DataRowJson;
+import Table.DataTableJson;
+
+/**
+ * 
+ * 
+ * 项目名称：IDBStandardized 类名称：SqlDataReader 类描述： 创建人：jinyu 创建时间：2017年3月6日
+ * 下午8:43:59 修改人：jinyu 修改时间：2017年3月6日 下午8:43:59 修改备注：
+ * 
+ * @version
+ *
+ */
+public class SqlDataReader {
+    DataTableJson result = null;
+    DBResult  cache=null;
+
+    /**
+     * 服务端分配的缓存ID
+     */
+    private int id = -1;
+
+    /**
+     * 数据是否结束
+     * 主要是客户端抽取数据使用
+     */
+    private int eof = 0;
+
+    private  Proxy proxy = null;//通信接口
+    public boolean is_MD5=false;//加密
+    private String dataState="sucess";//sucess正常返回，reset重置获取,close关闭
+    private float requestRate=0.4f;//小于该比例时查询数据
+    private boolean cacheQuery=true;
+    public boolean isQuery=false;
+  
+  /*
+   * 设置连接代理,使用已经存在的
+   */
+  public void SetProxy(Proxy obj)
+  {
+      proxy=obj;
+  }
+  /*
+   * 重新创建
+   */
+  public void SetProxy(String addr,int port)
+  {
+      proxy=new Proxy(addr,port);
+  }
+  /*
+   * 设置连接，需要重新连接
+   */
+  public void SetProtocol(IDDS_Protocol protocol,String addr,int port)
+  {
+      proxy=new Proxy(protocol,addr,port);
+  }
+    public SqlDataReader(DBResult r) {
+        result = (DataTableJson) r.Result;
+        id = r.id;
+        if (r.Code == ErrorCode.DataAll) {
+            eof = 1;
+        }
+    }
+
+    public DataRowJson next() {
+        if (eof == 0 && cacheQuery&&result.getReadRate()<this.requestRate) {
+           // result.getReadRate()<this.requestRate
+            DBResult r = proxy.getNextReader(id, dataState,this);
+            System.out.println("SqlDataReader启动查询");
+            if(r==null)
+            {
+                dataState="reset";
+                cacheQuery=true;
+            }
+            else
+            {
+                dataState="sucess";
+            }
+            this.cache=r;
+            result=(DataTableJson) r.Result;
+            id = r.id;
+            cacheQuery=false;
+            if (r.Code == ErrorCode.DataAll) {
+                eof = 1;
+                cacheQuery=false;
+            }
+        }
+        if(eof == 0&&!result.HasData())
+        {
+            //没有数据时置换
+            result=(DataTableJson) cache.Result;
+            id = cache.id;
+            cacheQuery=true;
+        }
+        return result.next();
+    }
+
+    public void Close() {
+        proxy.SendQuest(id, "close");
+    }
+
+    // public Object Get
+    public boolean HasNext() {
+        return result.HasData() || eof == 0;
+
+    }
+}

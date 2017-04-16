@@ -1,0 +1,92 @@
+package DBProxy;
+
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.border.EmptyBorder;
+
+import org.pushingpixels.flamingo.api.common.icon.ImageWrapperResizableIcon;
+import org.pushingpixels.flamingo.api.common.icon.ResizableIcon;
+
+import javax.swing.JTabbedPane;
+import javax.swing.BoxLayout;
+import javax.swing.JTable;
+import javax.swing.JScrollPane;
+
+public class FrmServer extends JFrame {
+	private static final long serialVersionUID = 1L;
+    static {
+        try {
+
+            javax.swing.UIManager
+                    .setLookAndFeel("org.pushingpixels.substance.api.skin.SubstanceOfficeBlue2007LookAndFeel");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+ // 根据图片的地址获取该图片，返回ResizableIcon
+    public static ResizableIcon getResizableIconFromResource(String resource) {
+
+        try {
+            return ImageWrapperResizableIcon.getIcon(FrmMain.class.getClassLoader().getResource(resource),
+                    new Dimension(48, 48));
+        } catch (Exception ex) {
+            System.out.println(resource);
+            return null;
+        }
+
+    }
+	private JPanel contentPane;
+	private JTable table;
+
+	/**
+	 * Launch the application.
+	 */
+	public static void main(String[] args) {
+		 JFrame.setDefaultLookAndFeelDecorated(true); // windows功能失效
+	        JDialog.setDefaultLookAndFeelDecorated(true); // Dialog功能失效
+		EventQueue.invokeLater(new Runnable() {
+			public void run() {
+				try {
+					FrmServer frame = new FrmServer();
+					frame.setVisible(true);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	/**
+	 * Create the frame.
+	 */
+	public FrmServer() {
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setBounds(100, 100, 496, 488);
+		contentPane = new JPanel();
+		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
+		contentPane.setLayout(new BorderLayout(0, 0));
+		setContentPane(contentPane);
+		
+		JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+		contentPane.add(tabbedPane, BorderLayout.CENTER);
+		
+		JPanel panel = new JPanel();
+		tabbedPane.addTab("New tab", null, panel, null);
+		panel.setLayout(new BoxLayout(panel, BoxLayout.X_AXIS));
+		
+		JScrollPane scrollPane = new JScrollPane();
+		panel.add(scrollPane);
+		
+		table = new JTable();
+		scrollPane.setViewportView(table);
+		
+		JPanel panel_1 = new JPanel();
+		tabbedPane.addTab("New tab", null, panel_1, null);
+	}
+
+}

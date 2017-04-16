@@ -1,0 +1,153 @@
+/**    
+ * 文件名：DataTableJson.java    
+ *    
+ * 版本信息：    
+ * 日期：2017年3月15日    
+ * Copyright 足下 Corporation 2017     
+ * 版权所有    
+ *    
+ */
+package Table;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/**    
+ *     
+ * 项目名称：IDBStandardized    
+ * 类名称：DataTableJson    
+ * 类描述：    表结构 面向列存储
+ * 创建人：jinyu    
+ * 创建时间：2017年3月15日 下午8:44:53    
+ * 修改人：jinyu    
+ * 修改时间：2017年3月15日 下午8:44:53    
+ * 修改备注：    
+ * @version     
+ *     
+ */
+public class DataTableJson {
+//当前表作为一部分指示的索引
+public  int Cursor = 0;
+//表名称
+public String tableName;
+//列数据
+public List<DataColumnJson> Columns=new ArrayList<DataColumnJson>();
+public DataRowJson[] Rows;//行数据
+public HashMap<String,Integer> columnsIndex=new HashMap<String,Integer>();
+public int rowCount=0;//当前有的行数
+private int index=-1;
+private int nextadd=1;
+/*
+ * 如果当前行还没有转换则转换
+ * 否则获取
+ */
+private DataRowJson ConvertRow(int index)
+{ 
+  // DataRowJson row=AddRow();
+   //
+    if(Rows==null&&index==-1)
+    {
+        //初始化
+        rowCount=Columns.get(0).listData.size();
+       //说明还没有转换行
+        Rows=new DataRowJson[rowCount];
+    }
+    if(index>rowCount)
+    {
+        return null;
+    }
+    
+   DataRowJson row=Rows[index];
+   if(row==null)
+   {
+       //没有转换该行
+       row=new DataRowJson();
+   for(int i=0;i<Columns.size();i++)
+   {
+       row.items.add(Columns.get(i).listData.get(index));
+   }
+   }
+   return row;
+}
+
+/*
+ * 完全信添加行
+ */
+public DataRowJson AddRow()
+{
+//    DataRowJson row=new DataRowJson();
+//    if(Rows==null)
+//    {
+//        Rows=new DataRowJson[15];
+//    }
+//    else
+//    {
+//        if(index==Rows.length)
+//        {
+//              //扩展行
+//            DataRowJson[] tmp=new DataRowJson[Rows.length+15];
+//            System.arraycopy(Rows, 0, tmp, 0, Rows.length);
+//            Rows=tmp;
+//        }
+//    }
+    if(Rows==null&&index==-1)
+    {
+        //初始化
+        rowCount=Columns.get(0).listData.size();
+       //说明还没有转换行
+        Rows=new DataRowJson[rowCount];
+    }
+    else
+    {
+        if(nextadd==Rows.length)
+          {
+                //扩展行
+                //每次添加一行很费事
+              DataRowJson[] tmp=new DataRowJson[Rows.length+15];
+              System.arraycopy(Rows, 0, tmp, 0, Rows.length);
+              Rows=tmp;
+          }
+    }
+    nextadd++;//指示真实添加的位置
+    DataRowJson row=new DataRowJson();
+    Rows[nextadd]=row;
+    row.index=nextadd;
+    row.table=this;
+    return row;
+}
+public DataRowJson GetRow(int index)
+{
+//    if(Rows==null&&index==-1)
+//    {
+//        rowCount=Columns.get(0).listData.size();
+//       //说明还没有转换行
+//        Rows=new DataRowJson[rowCount];
+//    }
+//    if(index>rowCount)
+//    {
+//        return null;
+//    }
+//    else
+//    {
+        DataRowJson row=ConvertRow(index);
+        return row;
+    //}
+    
+}
+public boolean HasData() {
+    if(index<rowCount)
+    {
+        return true;
+    }
+    else
+    {
+    return false;
+    }
+}
+public DataRowJson next() {
+    DataRowJson row=  ConvertRow(index);
+    index++;
+    return row;
+}
+}

@@ -1,0 +1,27 @@
+/**    
+ * 文件名：SimpleCache.java    
+ *    
+ * 版本信息：    
+ * 日期：2017年4月12日    
+ * Copyright 足下 Corporation 2017     
+ * 版权所有    
+ *    
+ */
+package JudtProtocol;
+
+/**    
+ *     
+ * 项目名称：ThirdPartyProtocol    
+ * 类名称：SimpleCache    
+ * 类描述：    
+ * 创建人：jinyu    
+ * 创建时间：2017年4月12日 下午11:17:00    
+ * 修改人：jinyu    
+ * 修改时间：2017年4月12日 下午11:17:00    
+ * 修改备注：    
+ * @version     
+ *     
+ */
+public final class SimpleCache<K, V> {
+
+}

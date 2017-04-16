@@ -1,0 +1,346 @@
+package DBSqlManager;
+
+import java.nio.ByteBuffer;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import Com.DBHelper.DBManager;
+import Common.JsonConvert;
+import Common.NetDataMD5;
+import DBError.ErrorCode;
+
+import DDS_Transfer.IDDS_Protocol;
+import DataStruct.DBResult;
+
+import DataStruct.MethodType;
+import DataStruct.ParameterJson;
+import DataStruct.SqlRequest;
+import LogInfo.LogInfo;
+import LogInfo.LogType;
+import ProcessMessage.InnerMessage;
+import ServerCommon.DataReader;
+import ServerCommon.ServerConfig;
+import Table.DataTableJson;
+
+/**
+ * 
+ *     
+ * 项目名称：DBSqlManager    
+ * 类名称：ProcessQuest    
+ * 类描述：    处理请求
+ * 创建人：jinyu    
+ * 创建时间：2017年3月8日 上午12:36:43    
+ * 修改人：jinyu    
+ * 修改时间：2017年3月8日 上午12:36:43    
+ * 修改备注：    
+ * @version     
+ *
+ */
+public class ProcessQuest {
+    DBManager manager = new DBManager();
+    private static int num=0;
+    public void Process(SqlRequest requet, IDDS_Protocol obj) {
+    	 manager.poolName=ServerConfig.ConnectionString;
+    	 LogInfo log=new LogInfo();
+    	 if(log.isAllowTest())
+    	 {
+    		 log.logType=LogType.Test;
+    		 log.logMsg="接收到信息";
+    	     InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+    	 }
+    	if(requet==null)
+    	{
+    		//本程序唯一的debug信息，无法确认是错误情况还是测试发送空信息
+    		log=new LogInfo();
+       	    log.logType=LogType.Debug;
+       		log.logMsg="接收到空请求";
+       	    InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+    		return;
+    	}
+    	if(requet.TestInfo!=null&!requet.TestInfo.isEmpty())
+    	{
+    		    //该信息针对日志而言是一般输出信息
+        		 log.logType=LogType.Nomral;
+        		 log.logMsg= "接收测试信息:"+requet.TestInfo;
+        	     InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+    	}
+    	long start=System.currentTimeMillis();
+        if (requet.sql.matches("^[0-9]*$")) {
+            // 全部是数字
+            Integer id = Integer.valueOf(requet.sql);
+            if (requet.CloseFlage.equals("close")) {
+                close(id);
+            } else {
+                SqlReaderNext(id, obj,requet.CloseFlage);
+            }
+        } else {
+            Query(requet, obj);
+            NonExecute(requet, obj);
+            SqlReaderFun(requet, obj);
+        }
+        long end=System.currentTimeMillis();
+        String threadName=  Thread.currentThread().getName();
+        String logdebug="当前数据库操作处理耗时(秒)："+(end-start)/1000;
+        logdebug=logdebug+",当前线程："+threadName;
+        System.out.println(logdebug);
+    }
+
+    private void Query(SqlRequest request, IDDS_Protocol obj) {
+        if (request.methodType == MethodType.ExecuteQuery || request.methodType == MethodType.ExecuteSclar) {
+            ResultSet rs = manager.executeQuery(request.sql);
+            QueryResult(request.methodType, obj, rs);
+        } else if (request.methodType == MethodType.ExecuteQueryParam
+                || request.methodType == MethodType.ExecuteSclarParam) {
+            String[] name = new String[request.Parameter.ParameterData.size()];
+            Object[] objP = new Object[request.Parameter.ParameterData.size()];
+            int[] type = new int[request.Parameter.ParameterData.size()];
+            int num = request.Parameter.ParameterData.size();
+            for (int i = 0; i < num; i++) {
+                if (request.Parameter.ParameterInfo.size() > i) {
+                    ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                    type[i] = param.ParameterType.ordinal();
+                    name[i] = param.ParameterName;
+                }
+                if (request.Parameter.ParameterData.size() > i) {
+                    objP[i] = request.Parameter.ParameterData.get(i);
+                }
+            }
+            ResultSet rs = manager.executeQueryParam(request.sql, name, objP, type);
+            QueryResult(request.methodType, obj, rs);
+            InnerMessage.getInstance().PostMessage(this, "UIMsg", "查询结果回发");
+        }
+    }
+
+    private void QueryResult(MethodType curType, IDDS_Protocol obj, ResultSet rs) {
+        long sumbytes=0;
+        int sendNum=0;
+        long curRowNum=0;
+        while (true) {
+           if(rs==null)
+        	{
+        		//该信息是运行错误信息
+        		LogInfo log = new LogInfo();
+           	    log.logType=LogType.Error;
+           		log.logMsg="数据库查询失败，无法打开数据库查询数据!";
+           	    InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+        		 return;
+        	}
+        	boolean EOF=false;
+        	if(sendNum==310)
+        	{
+        	    System.out.println("当前发送字节，发送行数："+sumbytes+","+curRowNum);
+        	}
+            DataTableJson dt = QueryConvert.ConvertDataTable(rs, ServerConfig.BackClient);
+            DBResult result = new DBResult();
+            result.Result = dt;
+            if (curType == MethodType.ExecuteSclar) {
+                // 处理下
+                try {
+                    //获取第一行第一列
+                  //  result.Result = dt.Columns.get(0).listData.get(0);
+                    result.Result = dt.columns.get(0).getData(0);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    result.Result = null;
+                }
+            }
+            //
+            if(dt==null||dt.Cursor == 0 || dt.Cursor < ServerConfig.BackClient)
+            {
+                EOF=true;
+                result.Code=ErrorCode.DataAll;
+            }
+           
+            curRowNum+=dt.rowCount;
+            //
+             sendData(obj,result);
+             sendNum++;
+             if(EOF)
+             {
+                 
+                 LogInfo log=new LogInfo();
+                if(log.isAllowTest())
+                 {
+                     log.logType=LogType.Test;
+                     log.logMsg="回发次数："+sendNum;
+                     InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+                 }
+                 if(log.isAllowTest())
+                 {
+                     log.logType=LogType.Test;
+                     log.logMsg="回发总行数："+curRowNum;
+                     InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+                 }
+                 //查询完成
+                 try {
+                    rs.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+                 obj.ClientSocketClose();
+                 break;
+             }
+        }
+    }
+
+    private void NonExecute(SqlRequest request, IDDS_Protocol obj) {
+        DBResult result = new DBResult();
+        if (request.methodType == MethodType.ExecuteNonQuery || request.methodType == MethodType.ExecuteNonQueryParam) {
+            if (request.methodType == MethodType.ExecuteNonQuery) {
+                int r = manager.executeUpdate(request.sql);
+                result.Result = r;
+            } else {
+
+                Object[] objP = new Object[request.Parameter.ParameterData.size()];
+                int[] type = new int[request.Parameter.ParameterData.size()];
+                int num = request.Parameter.ParameterData.size();
+                for (int i = 0; i < num; i++) {
+                    if (request.Parameter.ParameterInfo.size() > i) {
+                        ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                        type[i] = param.ParameterType.ordinal();
+
+                    }
+                    if (request.Parameter.ParameterData.size() > i) {
+                        objP[i] = request.Parameter.ParameterData.get(i);
+                    }
+                }
+                boolean r = manager.executeSql(request.sql, objP, type);
+
+                result.Result = r;
+            }
+              sendData(obj,result);
+        }
+       
+       
+    }
+
+    private void SqlReaderFun(SqlRequest request, IDDS_Protocol obj) {
+        ResultSet rs = null;
+        if (request.methodType == MethodType.ExecuteReader || request.methodType == MethodType.ExecuteReaderParam) {
+            if (request.methodType == MethodType.ExecuteReader) {
+                rs = manager.executeQuery(request.sql);
+            } else {
+
+                Object[] objP = new Object[request.Parameter.ParameterData.size()];
+                int[] type = new int[request.Parameter.ParameterData.size()];
+                int num = request.Parameter.ParameterData.size();
+                for (int i = 0; i < num; i++) {
+                    if (request.Parameter.ParameterInfo.size() > i) {
+                        ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                        type[i] = param.ParameterType.ordinal();
+
+                    }
+                    if (request.Parameter.ParameterData.size() > i) {
+                        objP[i] = request.Parameter.ParameterData.get(i);
+                    }
+                }
+                rs = manager.executeQueryParam(request.sql, null, objP, type);
+
+            }
+
+        }
+        if (rs != null) {
+
+            int curID = ServerConfig.GlobalID++;
+            DataReader reader = new DataReader();
+            reader.rs = rs;
+           // reader.cache = null;
+            ServerDataReader.setID.put(curID, reader);
+            // 数据发回
+            DataTableJson dt = QueryConvert.ConvertDataTable(rs, ServerConfig.SqlReaderNum);
+            DBResult result = new DBResult();
+            result.Result = dt;
+            result.id = curID;
+            if(dt.columns.get(0).getRowNum()<ServerConfig.SqlReaderNum){
+               result.Code = ErrorCode.DataAll;
+             try {
+                rs.close();
+               } catch (SQLException e) {
+                 e.printStackTrace();
+               } }
+            else
+            {
+                result.Code=ErrorCode.ReaderGroup;
+            }
+            sendData(obj,result);
+           
+            if (result.Code != ErrorCode.DataAll) {
+                SqlReaderNext(curID, null,"sucess");
+            }
+        }
+    }
+
+    private void SqlReaderNext(int id, IDDS_Protocol obj,String flage) {
+        DataReader reader = null;
+        reader = ServerDataReader.setID.getOrDefault(id, null);
+        if (reader != null) {
+            if (obj == null) {
+                DataTableJson dt = QueryConvert.ConvertDataTable(reader.rs, ServerConfig.SqlReaderNum);
+                reader.cache = dt;
+            } else {
+                DBResult result = new DBResult();
+                result.Result = reader.cache;
+                result.id = id;
+                result.Code=ErrorCode.ReaderGroup;
+                if(reader.cache.columns.get(0).getRowNum() < ServerConfig.SqlReaderNum){
+                    result.Code = ErrorCode.DataAll;
+                    //
+                      ServerDataReader.setID.remove(id);
+                    try {
+                        reader.rs.close();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+                sendData(obj,result);
+                //
+                if (result.Code != ErrorCode.DataAll) {
+                    DataTableJson dt = QueryConvert.ConvertDataTable(reader.rs, ServerConfig.SqlReaderNum);
+                    reader.cache = dt;
+                    
+                }
+            }
+        }
+
+    }
+   
+    private void sendData(IDDS_Protocol obj,DBResult result,int ...arg)
+  {
+      byte[]data=JsonConvert.ConvertJsonByte(result);
+      //
+      if(ServerConfig.Is_MD5)
+      {
+          data=NetDataMD5.encryptDataPackage(data);
+      }
+      //
+      LogInfo log=new LogInfo();
+      if(log.isAllowTest())
+      {
+          log.logType=LogType.Test;
+          log.logMsg="回发字节："+data.length;
+          InnerMessage.getInstance().PostMessage(this, "UIMsg", log);
+      }
+      byte[]buffer=new byte[data.length+8];
+      ByteBuffer buf = ByteBuffer.wrap(buffer);
+      buf.putLong(data.length);
+      buf.put(data);
+      buf.flip();
+      data=buf.array();
+      String info="发送次数："+(num++)+" 回复字节："+data.length;
+      System.out.println(info);
+      obj.ServerSocketSendData(data);
+      System.out.println("回复完成!");
+  }
+
+    private void close(int id) {
+        DataReader reader = ServerDataReader.setID.remove(id);
+        if (reader != null) {
+            try {
+                reader.rs.close();
+            } catch (SQLException e) {
+
+                e.printStackTrace();
+            }
+        }
+    }
+}

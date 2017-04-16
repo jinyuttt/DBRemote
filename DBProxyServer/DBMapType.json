@@ -1,0 +1,1 @@
+{"NUMERIC":"BigDecimal","FLOAT":"double","BINARY":"byte[]","CHAR":"String","DECIMAL":"BigDecimal","BIGINT":"long","BIT":"boolean","DATE":"DATE","SMALLINT":"short","TIMESTAMP":"long","VARCHAR":"String","REAL":"float","VARBINARY":"byte[]","LONGVARBINARY":"Byte[]","DOUBLE":"double","TINYINT":"byte","INTEGER":"int","INT8":"long"}

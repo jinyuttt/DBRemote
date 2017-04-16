@@ -1,0 +1,50 @@
+package TestClient;
+import DBClient.DBClientManager;
+
+import DataStruct.DBResult;
+
+public class TestClient {
+
+	public static void main(String[] args) {
+	
+		while(true)
+		{
+		  String sql = "select * from test";
+		 // sql="insert into test values(1,'ffsdgd','ss','dfghj','rtewert')";
+		  DBClientManager client=new DBClientManager();
+	       DBResult r=	client.ExecuteQuery(sql);
+		  //DBResult   r=client.ExecuteNonQuery(sql);
+	       if(r!=null)
+	       {
+	    	   String strObj="";
+	    	   if(r.Result!=null)
+	    	   {
+	    		   strObj=r.Result.toString();
+	    		   System.out.println(strObj);
+	    	   }
+	    	  if(!strObj.isEmpty())
+	    	  {
+//	    		  DataTableJson dttmp = JsonConvert.ConvertToObj(strObj, DataTableJson.class);
+//	    		  if(dttmp!=null)
+//	    		  {
+	    			  System.out.println("查询数据成功");
+	    		 // }
+	    	  }
+            }
+	       else
+	       {
+	           System.out.println("返回空");
+	       }
+				try {
+					Thread.sleep(600000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			
+		}
+         
+         
+	}
+
+}

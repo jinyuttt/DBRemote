@@ -1,0 +1,1 @@
+{"driverName":"org.postgresql.Driver","isMemory":false,"password":"1234","poolName":"postgresql","poolType":0,"url":"jdbc:postgresql://127.0.0.1:5432/PeostgreDB","userName":"postgres"}

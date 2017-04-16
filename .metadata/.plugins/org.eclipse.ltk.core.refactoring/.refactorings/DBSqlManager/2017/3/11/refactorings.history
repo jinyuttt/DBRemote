@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Move element &apos;NetDataPazkageSize.java&apos; to &apos;DataTable/src/Table&apos;&#x0D;&#x0A;- Original project: &apos;DBSqlManager&apos;&#x0D;&#x0A;- Destination element: &apos;DataTable/src/Table&apos;&#x0D;&#x0A;- Original element: &apos;DBSqlManager.NetDataPazkageSize.java&apos;&#x0D;&#x0A;- Update references to refactored element" description="Move compilation unit" destination="=DataTable/src&lt;Table" element1="/src&lt;DBSqlManager{NetDataPazkageSize.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.move" patterns="*" policy="org.eclipse.jdt.ui.moveResources" qualified="false" references="true" stamp="1489858952533" units="1" version="1.0"/>
+</session>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Extract method &apos;private void CallData(IRecMsg rec, byte [] tmp, String address)&apos; from &apos;ThirdPartyProtocol.UdtProtocol.RecData().new Runnable() {...}.run()&apos; to &apos;ThirdPartyProtocol.UdtProtocol.RecData().new Runnable() {...}&apos;&#x0D;&#x0A;- Original project: &apos;ThirdPartyProtocol&apos;&#x0D;&#x0A;- Method name: &apos;CallData&apos;&#x0D;&#x0A;- Destination type: &apos;ThirdPartyProtocol.UdtProtocol.RecData().new Runnable() {...}&apos;&#x0D;&#x0A;- Declared visibility: &apos;private&apos;" comments="false" description="Extract method &apos;CallData&apos;" destination="0" exceptions="false" flags="786434" id="org.eclipse.jdt.ui.extract.method" input="/src&lt;ThirdPartyProtocol{UdtProtocol.java" name="CallData" replace="false" selection="3464 59" stamp="1489214994343" version="1.0" visibility="2"/>
+</session>

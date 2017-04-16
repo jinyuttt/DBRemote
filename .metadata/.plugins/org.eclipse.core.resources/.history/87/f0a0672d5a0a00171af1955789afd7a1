@@ -1,0 +1,49 @@
+package TestClient;
+
+
+import Common.JsonConvert;
+import DBClient.DBClientManager;
+
+import DataStruct.DBResult;
+import Table.DataTableJson;
+
+
+public class TestClient {
+
+	public static void main(String[] args) {
+	
+		while(true)
+		{
+		  String sql = "select * from Test";
+		  DBClientManager client=new DBClientManager();
+	       DBResult r=	client.ExecuteQuery(sql);
+	       if(r!=null)
+	       {
+	    	   String strObj="";
+	    	   if(r.Result!=null)
+	    	   {
+	    		   strObj=r.Result.toString();
+	    		   System.out.println(strObj);
+	    	   }
+	    	  if(!strObj.isEmpty())
+	    	  {
+	    		  DataTableJson dttmp = JsonConvert.ConvertToObj(strObj, DataTableJson.class);
+	    		  if(dttmp!=null)
+	    		  {
+	    			  System.out.println("查询数据成功");
+	    		  }
+	    	  }
+            }
+				try {
+					Thread.sleep(30000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			
+		}
+         
+         
+	}
+
+}

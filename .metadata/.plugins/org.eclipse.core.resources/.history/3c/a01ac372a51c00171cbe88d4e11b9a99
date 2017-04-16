@@ -1,0 +1,293 @@
+package DBClient;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+import Common.JsonConvert;
+import Common.NetDataMD5;
+import DBError.ErrorCode;
+import DBManager.Parameter;
+import DBManager.SqlDataReader;
+import DDS_Transfer.IDDS_Protocol;
+import DataStruct.BatchData;
+import DataStruct.DBResult;
+import DataStruct.MethodType;
+import DataStruct.ParameterJson;
+import DataStruct.SqlRequest;
+
+import ProtocolsManager.ProtocolManager;
+import Table.DataTableJson;
+
+public class DBClientManager {
+    IDDS_Protocol protocol = null;
+
+    public DBClientManager() {
+        if (protocol == null) {
+            try {
+                protocol = (IDDS_Protocol) ProtocolManager.getInstance().CreateObject(ClientConfig.protocol);
+                protocol.CreateClient();
+                protocol.Connect(ClientConfig.remoteAddr, ClientConfig.remotePort);
+            } catch (InstantiationException e) {
+
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public DBResult ExecuteNonQuery(String sql) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteNonQuery;
+        return CreateRequest(request);
+    }
+
+    public DBResult ExecuteSclar(String sql) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteSclar;
+        return CreateRequest(request);
+    }
+
+    public SqlDataReader ExecuteReader(String sql) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteReader;
+        return CreateReqReader(request);
+    }
+
+    public DBResult ExecuteQuery(String sql) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteQuery;
+        return CreateRequest(request);
+    }
+
+    public DBResult ExecuteNonQuery(String sql, Parameter... param) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteNonQueryParam;
+        BatchData batch = new BatchData();
+        for (int i = 0; i < param.length; i++) {
+            Parameter cp = param[i];
+            ParameterJson p = new ParameterJson();
+            p.ParameterType = cp.ParameterType;
+            p.ParameterName = cp.ParameterName;
+            batch.ParameterInfo.add(p);
+            batch.ParameterData.add(cp.ParamValue);
+        }
+        request.Parameter = batch;
+        return CreateRequest(request);
+
+    }
+
+    public DBResult ExecuteSclar(String sql, Parameter... param) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteSclar;
+        BatchData batch = new BatchData();
+        for (int i = 0; i < param.length; i++) {
+            Parameter cp = param[i];
+            ParameterJson p = new ParameterJson();
+            p.ParameterType = cp.ParameterType;
+            p.ParameterName = cp.ParameterName;
+            batch.ParameterInfo.add(p);
+            batch.ParameterData.add(cp.ParamValue);
+        }
+        request.Parameter = batch;
+        return CreateRequest(request);
+    }
+
+    public SqlDataReader ExecuteReader(String sql, Parameter... param) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteSclar;
+        BatchData batch = new BatchData();
+        for (int i = 0; i < param.length; i++) {
+            Parameter cp = param[i];
+            ParameterJson p = new ParameterJson();
+            p.ParameterType = cp.ParameterType;
+            p.ParameterName = cp.ParameterName;
+            batch.ParameterInfo.add(p);
+            batch.ParameterData.add(cp.ParamValue);
+        }
+        request.Parameter = batch;
+        return CreateReqReader(request);
+    }
+
+    public DBResult ExecuteQuery(String sql, Parameter... param) {
+        SqlRequest request = new SqlRequest();
+        request.sql = sql;
+        request.methodType = MethodType.ExecuteQueryParam;
+        BatchData batch = new BatchData();
+        for (int i = 0; i < param.length; i++) {
+            Parameter cp = param[i];
+            ParameterJson p = new ParameterJson();
+            p.ParameterType = cp.ParameterType;
+            p.ParameterName = cp.ParameterName;
+            batch.ParameterInfo.add(p);
+            batch.ParameterData.add(cp.ParamValue);
+        }
+        request.Parameter = batch;
+        return CreateRequest(request);
+    }
+
+    private DBResult CreateRequest(SqlRequest obj) {
+        if (protocol != null) {
+           try
+           {
+            long sumBytes=0;
+            byte[] data = JsonConvert.ConvertJsonByte(obj);
+            protocol.ClientSocketSendData(data);
+            byte[] buffer=null;
+            DBResult dbResult=null;
+            while(true)
+            {
+                try
+                {
+                  data = protocol.RecClientSocketData();
+                }
+                catch(Exception ex)
+                {
+                    ex.printStackTrace();
+                    break;
+                }
+             sumBytes+=data.length;
+            System.out.println("返回字节:"+data.length);
+            if(ClientConfig.Is_MD5)
+            {
+               data= NetDataMD5.decryptBy3DES(data);
+            }
+            //
+            ByteBuffer buf=null;
+            if(data==null)
+            {
+                continue;
+            }
+            if(buffer!=null)
+            {
+                System.out.println("上次剩余字节："+buffer);
+                buf=ByteBuffer.allocate(buffer.length+data.length);
+                buf.put(buffer);
+                buf.put(data);
+                buf.flip();
+            }
+            else
+            {
+                buf=ByteBuffer.wrap(data);
+            }
+            //按照字节接受;循序读取
+           System.out.println("解析字节1");
+            List<byte[]> list=RecviceGroupData(buf);
+            System.out.println("解析整行："+list.size());
+           for(int i=0;i<list.size();i++)
+            {
+            DBResult result = JsonConvert.ConvertToObj(list.get(i), DBResult.class);
+            //
+            if(dbResult==null)
+            {
+                DataTableJson r=null;
+                dbResult=result;
+                r=DataTableJsonConvert.Convert(dbResult);
+                dbResult.Result=r;
+            }
+            else
+            {
+                 DataTableJson r=null;
+                 DataTableJson tmp=null;
+                 r=(DataTableJson) dbResult.Result;
+                 tmp=DataTableJsonConvert.Convert(result);
+                 try
+                 {
+                 r.loadDataTableJson(tmp);
+                 }
+                 catch(Exception ex)
+                 {
+                     System.out.println("合并失败："+ex.getMessage());
+                 }
+                 dbResult.Code=result.Code;
+                 dbResult.id=result.id;
+            }
+           
+            //
+            buffer=new byte[buf.limit()-buf.position()];
+           if(buffer.length>0)
+           {
+               buf.get(buffer);
+           }
+           else
+           {
+               buffer=null;
+           }
+            }
+            //
+           if(dbResult.Code==ErrorCode.DataAll)
+           {
+                //数据查询完成则断开
+               System.out.println("查询数据库完成！");
+               protocol.ClientSocketClose();
+               break;
+           }
+            }
+            
+            System.out.println("返回总字节:"+sumBytes);
+            DataTableJson r=(DataTableJson) dbResult.Result;
+            System.out.println("返回行数:"+r.getRowNum());
+            return  dbResult;
+           }
+           catch(Exception ex)
+           {
+               System.out.println("接收字节："+ex.getMessage());
+               protocol.ClientSocketClose();
+               return null;
+           }
+        }
+        return null;
+    }
+
+    /*
+     * 利益引用传递
+     */
+    private List<byte[]> RecviceGroupData(ByteBuffer data)
+    {
+        ArrayList<byte[]> list=new ArrayList<byte[]>();
+       
+       while(data.position()<data.limit())
+       {
+         int len=(int)data.getLong();
+         System.out.println("当前批次长度:"+len);
+         System.out.println("当前批次位置:"+data.position());
+         System.out.println("当前批次限制:"+data.limit());
+         if(data.position()+len>data.limit())
+         {
+             //数据不足了；
+             System.out.println("当前批次不足:"+(data.limit()-data.position()));
+             data.position(data.position()-8);//数据置回
+             break;
+         }
+         byte[] bytedata=new byte[len];
+         data.get(bytedata);
+         list.add(bytedata);
+       }
+        return list;
+        
+    }
+    
+ 
+    private SqlDataReader CreateReqReader(SqlRequest obj) {
+        SqlDataReader reader = null;
+        if (protocol != null) {
+
+            byte[] data = JsonConvert.ConvertJsonByte(obj);
+            protocol.ClientSocketSendData(data);
+            data = protocol.RecClientSocket();
+            DBResult result = JsonConvert.ConvertToObj(data, DBResult.class);
+            reader = new SqlDataReader(result);
+            reader.SetProtocol(protocol,ClientConfig.remoteAddr, ClientConfig.remotePort);
+        }
+        return null;
+    }
+}

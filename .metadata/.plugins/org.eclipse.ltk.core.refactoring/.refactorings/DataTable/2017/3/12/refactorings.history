@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy element &apos;FastjsonObj.java&apos; to &apos;DBProxyServer/src/DBProxy&apos;&#x0D;&#x0A;- Original project: &apos;DataTable&apos;&#x0D;&#x0A;- Destination element: &apos;DBProxyServer/src/DBProxy&apos;&#x0D;&#x0A;- Original element: &apos;Table.FastjsonObj.java&apos;" description="Copy compilation unit" destination="=DBProxyServer/src&lt;DBProxy" element1="/src&lt;Table{FastjsonObj.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1489942358789" units="1" version="1.0"/>
+</session>

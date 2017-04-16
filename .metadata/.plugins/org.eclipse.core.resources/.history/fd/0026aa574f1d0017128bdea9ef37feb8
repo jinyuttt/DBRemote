@@ -1,0 +1,107 @@
+/**    
+ * 文件名：PluginManager.java    
+ *    
+ * 版本信息：    
+ * 日期：2017年4月10日    
+ * Copyright 足下 Corporation 2017     
+ * 版权所有    
+ *    
+ */
+package DBPluginManager;
+
+import java.io.File;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+
+import ClassUtil.JarUtil;
+
+/**    
+ *     
+ * 项目名称：DBPluginManager    
+ * 类名称：PluginManager    
+ * 类描述：    
+ * 创建人：jinyu    
+ * 创建时间：2017年4月10日 上午1:43:46    
+ * 修改人：jinyu    
+ * 修改时间：2017年4月10日 上午1:43:46    
+ * 修改备注：    
+ * @version     
+ *     
+ */
+public class PluginManager {
+    private static PluginManager instance=new PluginManager();
+    private PluginManager(){};
+    public  Class<?>[] clsType;
+    /*
+     * 单例
+     */
+    public static PluginManager getInstance()
+    {
+        return instance;
+    }
+    ConcurrentHashMap<String,Class<?>> hashmap=new ConcurrentHashMap<String, Class<?>>();
+   
+    /*
+     * 创建实例
+     */
+    public  Object createObject(String name) throws InstantiationException, IllegalAccessException
+    {
+        if(hashmap.size()==0)
+        {
+            initPlugin("plugin");
+        }
+        Class<?> cl=hashmap.getOrDefault(name.toLowerCase(), null);
+        if(cl!=null)
+        {
+         return cl.newInstance();
+        }
+        else
+        {
+            return null;
+        }
+        
+    }
+    /*
+     * 初始化
+     */
+public void initPlugin(String protocolfile)
+{
+        JarUtil  loader=new JarUtil();
+        List<Class<?>> all=loader.getPathClass(protocolfile,new Class<?>[]{ IDBServerPlugin.IDBServerPlugin.class});
+        if(all!=null&&all.size()>0)
+        {
+            for(int i = 0;i<all.size();i++)
+            {
+                Class<?> tmp=(Class<?>)all.get(i);
+                    hashmap.put(tmp.getName(), tmp);
+                    
+                }
+                    
+                    
+            }
+}
+public void startAllPlugin(String path,int num)
+{
+    if(path==null||path.isEmpty())
+    {
+        initPlugin("plugin");
+    }
+    else
+    {
+        File f=new File(path);
+        if(f.isDirectory()&&f.exists())
+        {
+            initPlugin(path);
+        }else
+        {
+            System.out.println("插件路徑不存在");
+        }
+    }
+    for(Entry<String,Class<?>> kv:hashmap.entrySet())
+    {
+        kv.getValue().newInstance();
+    }
+}
+}
+

@@ -1,0 +1,235 @@
+package DBProxy;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Font;
+import java.awt.GridLayout;
+
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
+
+import org.pushingpixels.flamingo.api.common.icon.ImageWrapperResizableIcon;
+import org.pushingpixels.flamingo.api.common.icon.ResizableIcon;
+
+import DBSqlManager.RemoteProxy;
+import LogInfo.LogConfig;
+import LogInfo.LogInfo;
+import LogInfo.LogType;
+import ProcessMessage.InnerMessage;
+import ScriptFile.FileServerThread;
+import ServerCommon.ServerConfig;
+
+import javax.swing.JTabbedPane;
+
+import javax.swing.JTable;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JButton;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.Date;
+import java.util.logging.Level;
+import javax.swing.JCheckBox;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.ChangeEvent;
+
+public class FrmServer extends JFrame {
+	private static final long serialVersionUID = 1L;
+	
+    static {
+        try {
+
+            javax.swing.UIManager
+                    .setLookAndFeel("org.pushingpixels.substance.api.skin.SubstanceOfficeBlue2007LookAndFeel");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+ // 根据图片的地址获取该图片，返回ResizableIcon
+    public static ResizableIcon getResizableIconFromResource(String resource) {
+
+        try {
+            return ImageWrapperResizableIcon.getIcon(FrmServer.class.getClassLoader().getResource(resource),
+                    new Dimension(48, 48));
+        } catch (Exception ex) {
+            System.out.println(resource);
+            return null;
+        }
+
+    }
+	private JPanel contentPane;
+	private JTable table;
+	JTextArea textArea;
+	 RemoteProxy ServerProxy = null;
+
+	/**
+	 * Launch the application.
+	 */
+	public static void main(String[] args) {
+		 JFrame.setDefaultLookAndFeelDecorated(true); // windows功能失效
+	        JDialog.setDefaultLookAndFeelDecorated(true); // Dialog功能失效
+	        LogConfig.Is_Test=true;
+		EventQueue.invokeLater(new Runnable() {
+			public void run() {
+				try {
+					FrmServer frame = new FrmServer();
+					frame.setVisible(true);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	/**
+	 * Create the frame.
+	 */
+	public FrmServer() {
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setBounds(100, 100, 510, 488);
+		contentPane = new JPanel();
+		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
+		contentPane.setLayout(new BorderLayout(0, 0));
+		setContentPane(contentPane);
+		
+		JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+		contentPane.add(tabbedPane, BorderLayout.CENTER);
+		
+		JPanel panel = new JPanel();
+		tabbedPane.addTab("功能界面", null, panel, null);
+		panel.setLayout(new BorderLayout(5,5));
+		
+		
+		JPanel panel_Top = new JPanel();
+		panel.add(panel_Top, BorderLayout.WEST);
+		
+		JPanel panel_Fun = new JPanel();
+		panel.add(panel_Fun, BorderLayout.SOUTH);
+		
+		JButton btn_Start = new JButton("\u542F\u52A8");
+		btn_Start.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent arg0) {
+				  ServerProxy = new RemoteProxy();
+				  ServerProxy.init(GlobalConfig.LocalAddr);
+				    DefaultTableModel model=(DefaultTableModel) table.getModel();
+					Object[] data=new Object[]{new Date(),"一般","启动服务"};
+					model.addRow(data);
+			}
+		});
+		
+		JCheckBox chk_MD5 = new JCheckBox("\u52A0\u5BC6\u9A8C\u8BC1");
+		chk_MD5.addChangeListener(new ChangeListener() {
+		    public void stateChanged(ChangeEvent e) {
+		        ServerConfig.Is_MD5=chk_MD5.isSelected();
+		    }
+		});
+		panel_Fun.add(chk_MD5);
+		btn_Start.setFont(new Font("宋体", Font.PLAIN, 14));
+		panel_Fun.add(btn_Start);
+		
+		JButton btn_Stop = new JButton("\u505C\u6B62");
+		btn_Stop.setFont(new Font("宋体", Font.PLAIN, 14));
+		panel_Fun.add(btn_Stop);
+		
+		JButton btn_FileRec = new JButton("\u6587\u4EF6\u63A5\u6536");
+		btn_FileRec.addMouseListener(new MouseAdapter() {
+		    @Override
+		    public void mouseClicked(MouseEvent arg0) {
+		        FileServerThread recFile=new FileServerThread();
+		        recFile.runServer();
+		    }
+		});
+		panel_Fun.add(btn_FileRec);
+		
+		JButton btn_FileStop = new JButton("\u505C\u6B62\u63A5\u6536");
+		btn_FileStop.addMouseListener(new MouseAdapter() {
+		    @Override
+		    public void mouseClicked(MouseEvent arg0) {
+		        FileServerThread.StopServer();
+		    }
+		});
+		panel_Fun.add(btn_FileStop);
+		//panel_Fun.setPreferredSize(new Dimension(400, 100));
+		
+		
+		
+		JScrollPane scrollPane = new JScrollPane();
+		panel_Top.add(scrollPane);
+		panel_Top.setLayout(new BorderLayout(5,5));
+		
+		table = new JTable();
+		table.setModel(new DefaultTableModel(
+			new Object[][] {
+			},
+			new String[] {
+				"\u65F6\u95F4", "\u7C7B\u578B", "\u5185\u5BB9"
+			}
+		));
+		scrollPane.setViewportView(table);
+		
+		JPanel panel_log = new JPanel();
+		tabbedPane.addTab("测试日志", null, panel_log, null);
+	 textArea = new JTextArea(30,20);
+		
+        textArea.setTabSize(4);  
+        textArea.setFont(new Font("标楷体", Font.BOLD, 16));  
+        textArea.setLineWrap(true);// 激活自动换行功能  
+        textArea.setWrapStyleWord(true);// 激活断行不断字功能  
+        textArea.setBackground(Color.pink);
+		
+		JScrollPane scrollPane_log = new JScrollPane();
+		scrollPane_log.setViewportView(textArea);
+		panel_log.add(scrollPane_log);
+		panel_log.setLayout(new GridLayout(1, 3));
+		//
+
+		ProcessInnerMsg call=new ProcessInnerMsg();
+		call.SetObj(this);
+		InnerMessage.getInstance().Listen("UIMsg", call);
+		InnerMessage.getInstance().Listen("RunLog", call);
+		
+        //
+		
+		java.util.logging.Logger.getGlobal().setLevel(Level.OFF);
+	}
+	public void AddLog(Object content)
+	{
+		LogInfo info=(LogInfo)content;
+		if(info!=null)
+		{
+			if(info.isMsgString())
+			{
+			if(info.logType!=LogType.Test)
+			{
+				
+				DefaultTableModel model=(DefaultTableModel) table.getModel();
+				Object[] data=new Object[]{info.logTime,info.logType,info.logMsg};
+				if(model.getRowCount()>100)
+				{
+					model.setRowCount(0);
+				}
+				model.addRow(data);
+			}
+			else
+			{
+			   textArea.append(info.logMsg+"\r\n");
+			   if(textArea.getLineCount()>100)
+			   {
+				   textArea.setText("");
+			   }
+			}
+			}
+			
+		}
+		
+	
+	}
+	
+
+}

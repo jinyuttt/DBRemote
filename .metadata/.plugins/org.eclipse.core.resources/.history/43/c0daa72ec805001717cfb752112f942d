@@ -1,0 +1,229 @@
+package DBSqlManager;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import Com.DBHelper.DBManager;
+import Common.JsonConvert;
+import DBError.ErrorCode;
+
+import DDS_Transfer.IDDS_Protocol;
+import DataStruct.DBResult;
+import DataStruct.DataTableJson;
+import DataStruct.MethodType;
+import DataStruct.ParameterJson;
+import DataStruct.SqlRequest;
+import ProcessMessage.InnerMessage;
+import ServerCommon.DataReader;
+import ServerCommon.ServerConfig;
+
+/**
+ * 
+ *     
+ * 项目名称：DBSqlManager    
+ * 类名称：ProcessQuest    
+ * 类描述：    处理请求
+ * 创建人：jinyu    
+ * 创建时间：2017年3月8日 上午12:36:43    
+ * 修改人：jinyu    
+ * 修改时间：2017年3月8日 上午12:36:43    
+ * 修改备注：    
+ * @version     
+ *
+ */
+public class ProcessQuest {
+    DBManager manager = new DBManager();
+
+    public void Process(SqlRequest requet, IDDS_Protocol obj) {
+    	InnerMessage.getInstance().PostMessage(this, "UIMsg", "接收到信息");
+        if (requet.sql.matches("^[0-9]*$")) {
+            // 全部是数字
+            Integer id = Integer.valueOf(requet.sql);
+            if (requet.CloseFlage.equals("true")) {
+                Close(id);
+            } else {
+                SqlReaderLast(id, obj);
+            }
+        } else {
+            Query(requet, obj);
+            NonExecute(requet, obj);
+            SqlReaderFun(requet, obj);
+        }
+    }
+
+    private void Query(SqlRequest request, IDDS_Protocol obj) {
+        if (request.methodType == MethodType.ExecuteQuery || request.methodType == MethodType.ExecuteSclar) {
+            ResultSet rs = manager.executeQuery(request.sql);
+            QueryResult(request.methodType, obj, rs);
+        } else if (request.methodType == MethodType.ExecuteQueryParam
+                || request.methodType == MethodType.ExecuteSclarParam) {
+            String[] name = new String[request.Parameter.ParameterData.size()];
+            Object[] objP = new Object[request.Parameter.ParameterData.size()];
+            int[] type = new int[request.Parameter.ParameterData.size()];
+            int num = request.Parameter.ParameterData.size();
+            for (int i = 0; i < num; i++) {
+                if (request.Parameter.ParameterInfo.size() > i) {
+                    ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                    type[i] = param.ParameterType.ordinal();
+                    name[i] = param.ParameterName;
+                }
+                if (request.Parameter.ParameterData.size() > i) {
+                    objP[i] = request.Parameter.ParameterData.get(i);
+                }
+            }
+            ResultSet rs = manager.executeQueryParam(request.sql, name, objP, type);
+            QueryResult(request.methodType, obj, rs);
+            InnerMessage.getInstance().PostMessage(this, "UIMsg", "查询结果回发");
+        }
+    }
+
+    private void QueryResult(MethodType curType, IDDS_Protocol obj, ResultSet rs) {
+        while (true) {
+        	
+            DataTableJson dt = QueryConvert.ConvertDataTable(rs, ServerConfig.BackClient);
+            DBResult result = new DBResult();
+            result.Result = dt;
+            if (curType == MethodType.ExecuteSclar) {
+                // 处理下
+                try {
+                    result.Result = dt.Columns.get(0).ColumnData.get(0);
+                } catch (Exception ex) {
+                    result.Result = null;
+                }
+            }
+            obj.ServerSocketSendData(JsonConvert.ConvertJsonByte(result));
+            if (dt.Cursor == 0 || dt.Cursor < ServerConfig.BackClient) {
+                break;
+            }
+        }
+    }
+
+    private void NonExecute(SqlRequest request, IDDS_Protocol obj) {
+        DBResult result = new DBResult();
+        if (request.methodType == MethodType.ExecuteNonQuery || request.methodType == MethodType.ExecuteNonQueryParam) {
+            if (request.methodType == MethodType.ExecuteNonQuery) {
+                boolean r = manager.executeSql(request.sql);
+
+                result.Result = r;
+            } else {
+
+                Object[] objP = new Object[request.Parameter.ParameterData.size()];
+                int[] type = new int[request.Parameter.ParameterData.size()];
+                int num = request.Parameter.ParameterData.size();
+                for (int i = 0; i < num; i++) {
+                    if (request.Parameter.ParameterInfo.size() > i) {
+                        ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                        type[i] = param.ParameterType.ordinal();
+
+                    }
+                    if (request.Parameter.ParameterData.size() > i) {
+                        objP[i] = request.Parameter.ParameterData.get(i);
+                    }
+                }
+                boolean r = manager.executeSql(request.sql, objP, type);
+
+                result.Result = r;
+            }
+        }
+        obj.ServerSocketSendData(JsonConvert.ConvertJsonByte(result));
+    }
+
+    private void SqlReaderFun(SqlRequest request, IDDS_Protocol obj) {
+        ResultSet rs = null;
+        if (request.methodType == MethodType.ExecuteReader || request.methodType == MethodType.ExecuteReaderParam) {
+            if (request.methodType == MethodType.ExecuteReader) {
+                rs = manager.executeQuery(request.sql);
+            } else {
+
+                Object[] objP = new Object[request.Parameter.ParameterData.size()];
+                int[] type = new int[request.Parameter.ParameterData.size()];
+                int num = request.Parameter.ParameterData.size();
+                for (int i = 0; i < num; i++) {
+                    if (request.Parameter.ParameterInfo.size() > i) {
+                        ParameterJson param = request.Parameter.ParameterInfo.get(i);
+                        type[i] = param.ParameterType.ordinal();
+
+                    }
+                    if (request.Parameter.ParameterData.size() > i) {
+                        objP[i] = request.Parameter.ParameterData.get(i);
+                    }
+                }
+                rs = manager.executeQueryParam(request.sql, null, objP, type);
+
+            }
+
+        }
+        if (rs != null) {
+
+            int curID = ServerConfig.GlobalID++;
+            DataReader reader = new DataReader();
+            reader.rs = rs;
+            reader.cache = null;
+            ServerDataReader.setID.put(curID, reader);
+            // 数据发回
+            DataTableJson dt = QueryConvert.ConvertDataTable(rs, ServerConfig.SqlReaderNum);
+            DBResult result = new DBResult();
+            result.Result = dt;
+            result.id = curID;
+            if (dt.Columns.get(0).ColumnData.size() < ServerConfig.SqlReaderNum) {
+                result.Code = ErrorCode.DataAll;
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+
+                    e.printStackTrace();
+                }
+            }
+            obj.ServerSocketSendData(JsonConvert.ConvertJsonByte(result));
+            obj.Close();
+            if (result.Code != ErrorCode.DataAll) {
+                SqlReaderLast(curID, null);
+            }
+        }
+    }
+
+    private void SqlReaderLast(int id, IDDS_Protocol obj) {
+        DataReader reader = null;
+        reader = ServerDataReader.setID.getOrDefault(id, null);
+        if (reader != null) {
+            if (obj == null) {
+                DataTableJson dt = QueryConvert.ConvertDataTable(reader.rs, ServerConfig.SqlReaderNum);
+                reader.cache = dt;
+            } else {
+                DBResult result = new DBResult();
+                result.Result = reader.cache;
+                result.id = id;
+                if (reader.cache.Columns.get(0).ColumnData.size() < ServerConfig.SqlReaderNum) {
+                    result.Code = ErrorCode.DataAll;
+                    //
+                    ServerDataReader.setID.remove(id);
+                    try {
+                        reader.rs.close();
+                    } catch (SQLException e) {
+
+                        e.printStackTrace();
+                    }
+                }
+                obj.ServerSocketSendData(JsonConvert.ConvertJsonByte(result));
+                //
+                if (result.Code != ErrorCode.DataAll) {
+                    DataTableJson dt = QueryConvert.ConvertDataTable(reader.rs, ServerConfig.SqlReaderNum);
+                    reader.cache = dt;
+                }
+            }
+        }
+
+    }
+
+    private void Close(int id) {
+        DataReader reader = ServerDataReader.setID.remove(id);
+        if (reader != null) {
+            try {
+                reader.rs.close();
+            } catch (SQLException e) {
+
+                e.printStackTrace();
+            }
+        }
+    }
+}
